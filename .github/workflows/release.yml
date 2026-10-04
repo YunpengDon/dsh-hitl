@@ -43,14 +43,19 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           # Node 24 ships npm 11; the next step pins the CLI a little newer so
           # `npm stage` is certainly present rather than probably present.
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
+          # No `registry-url`: that option writes an .npmrc line reading
+          # `_authToken=${NODE_AUTH_TOKEN}`, and with no secret configured npm
+          # can spend the empty token before it tries OIDC — which is exactly
+          # the credential this workflow has. The default registry is already
+          # registry.npmjs.org, and `npm stage publish` prints it either way.
+          package-manager-cache: false
 
       - name: Use a CLI that knows `npm stage`
         run: |
