@@ -1,6 +1,6 @@
 {
   "name": "dsh-hitl",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Human-in-the-loop gate for DSH tool calls: mount any tool behind an approve / modify / reject decision card in the DSH Web UI, with an optional countdown.",
   "keywords": [
     "dsh",
