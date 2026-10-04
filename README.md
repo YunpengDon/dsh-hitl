@@ -375,7 +375,7 @@ dsh-hitl/
 │   ├── protocol.test.js    117   (16) frame and uplink validation
 │   ├── docs.test.js        116   (5) the two READMEs, their links, and the numbers in this very table
 │   └── manifest.test.js     61   (3) package metadata and the locale resource shape
-├── package.json             44   manifest: exports / dsh.bundle.patch / dsh.client / icon
+├── package.json             69   manifest: exports / dsh.bundle.patch / dsh.client / icon
 ├── cordis.patch.yml         17   the bundle's configuration layer (inserts the row with id `hitl`)
 ├── icon.svg                  6   the plugin list icon
 ├── README.md                     this document

@@ -444,7 +444,7 @@ dsh-hitl/
 │   ├── protocol.test.js    117   （16）帧与上行校验
 │   ├── docs.test.js        116   （5）两份 README、互链，以及上面这张表里的每个数字
 │   └── manifest.test.js     61   （3）包元数据与 locale 资源形状
-├── package.json             44   清单：exports / dsh.bundle.patch / dsh.client / icon
+├── package.json             69   清单：exports / dsh.bundle.patch / dsh.client / icon
 ├── cordis.patch.yml         17   bundle 的配置层（插入 id 为 hitl 的那一行）
 ├── icon.svg                  6   插件列表图标
 ├── README.md                     本文档（英文版）

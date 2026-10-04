@@ -1,11 +1,32 @@
 {
   "name": "dsh-hitl",
   "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "description": "Human-in-the-loop gate for DSH tool calls: other tools and plugins mount it, and the Web GUI asks the human before the tool executes.",
+  "description": "Human-in-the-loop gate for DSH tool calls: mount any tool behind an approve / modify / reject decision card in the DSH Web UI, with an optional countdown.",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "hitl",
+    "human-in-the-loop",
+    "approval",
+    "ai-agent",
+    "web-ui",
+    "plugin",
+    "bundle",
+    "cordis-plugin"
+  ],
+  "homepage": "https://github.com/YunpengDon/dsh-hitl#readme",
+  "bugs": {
+    "url": "https://github.com/YunpengDon/dsh-hitl/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YunpengDon/dsh-hitl.git"
+  },
+  "author": "YunpengDon",
   "license": "MIT",
   "icon": "./icon.svg",
+  "type": "module",
+  "main": "index.js",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -24,9 +45,13 @@
     "README.md",
     "README.zh.md"
   ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node --check index.js && node --check client.js && node --test tests/*.test.js"
+    "check": "node --check index.js && node --check client.js && node --test tests/*.test.js",
+    "prepublishOnly": "npm run check"
   },
   "dsh": {
     "bundle": {
