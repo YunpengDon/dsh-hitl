@@ -66,7 +66,7 @@ Once installed:
   config:
     protect:
       - tool: bash                      # tool name; patterns like 'mcp__*' work too
-        title: 执行命令前确认            # panel title (bold, wraps)
+        title: Confirm before running    # panel title (bold, wraps)
         countdown: { seconds: 30, action: reject }
         reject: { feedback: true }      # show the feedback box on reject
 ```
@@ -82,13 +82,13 @@ export const inject = ['hitl']            // wait for the hitl service before ap
 export function apply(ctx) {
   // Passing your own ctx as the third argument binds the mount to this plugin's lifetime
   ctx.hitl.protect('bash', {
-    title: '这条命令要执行吗？',
+    title: 'Run this command?',
     countdown: { seconds: 30, action: 'reject' },
     reject: { feedback: true },
   }, ctx)
 
   ctx.hitl.protect(['write', 'edit'], {   // arrays, globs, RegExp, and predicates all work
-    title: '改动前确认',
+    title: 'Confirm before editing',
     diff: { path: 'file_path', before: 'old_string', after: 'new_string' },  // folded into a side-by-side diff
     countdown: null,                     // no countdown = wait forever (still cancellable)
   }, ctx)
@@ -146,16 +146,16 @@ Without `fields`, the proposal is **every parameter of this call**:
 ### FieldSpec
 
 ```js
-{ param: 'content', title: '新内容', description: '会写入文件的内容',
+{ param: 'content', title: 'New content', description: 'Text that will be written to the file',
   render: 'markdown',        // markdown | text | diff | json | hidden
   editable: true,            // overrides the default editability
-  labels: ['不可撤销'],       // field-level labels
+  labels: ['irreversible'],  // field-level labels
   diff: { before: 'old_string', after: 'new_string', path: 'file_path' } }   // used when render: 'diff'
 ```
 
 - With no `render`, a field renders as a diff when one can be configured, and as a markdown input otherwise.
 - When `fields` is given, **only** the listed fields are shown (parameters you leave out never reach the panel).
-- Config rows may shorten a spec to a bare string: `fields: ['command', { param: 'cwd', title: '工作目录' }]`.
+- Config rows may shorten a spec to a bare string: `fields: ['command', { param: 'cwd', title: 'Working directory' }]`.
 
 ### The three endings of a countdown
 
