@@ -159,6 +159,7 @@ export function apply(ctx) {
 | `whenUnavailable` | `reject` \| `wait` | `reject` | 没有任何浏览器连接时的行为：`reject` = fail-closed；`wait` = 一直等，**务必配 `countdown`**，否则那次调用会挂到会话结束（挂载时宿主会给 `dsh-hitl:` 警告），见 §7.1 |
 | `enabled` | boolean \| `(exec) => boolean` | `true` | 临时关闭 / 条件挂载 |
 | `maxFieldChars` | number | `20000` | 单字段渲染上限，超出会截断并提示 |
+| `resolveTimeoutMs` | number | `5000` | 单个**计算字段**的解析上限；超时或抛错只让那个字段显示失败，不阻断这次调用 |
 
 ### FieldSpec
 
@@ -167,12 +168,37 @@ export function apply(ctx) {
   render: 'markdown',        // markdown | text | diff | json | hidden
   editable: true,            // 覆盖默认可编辑性
   labels: ['不可撤销'],       // 字段级标签
+  value: '固定文案',          // 该字段的文本：字面量，或 (exec) => string | Promise<string>
   diff: { before: 'old_string', after: 'new_string', path: 'file_path' } }   // render: 'diff' 时用
 ```
 
 - `render` 缺省时：能配出 diff 就渲染 diff，否则渲染 markdown 输入框。
 - `fields` 给定时**只显示**列出的字段（未列出的参数不会出现在面板里）。
 - 配置行里可以简写成字符串：`fields: ['command', { param: 'cwd', title: '工作目录' }]`。
+
+### 计算字段：把参数之外的东西放进卡里
+
+`diff.before` / `diff.after` / `diff.path` 平时填的是**参数名**（宿主取 `args[名字]`）。它们与字段的 `value` 一样，也可以填**函数**：宿主在弹卡前用这次调用的 `exec` 调它，把返回值当作文本。
+
+```js
+ctx.hitl.protect('update_index', {
+  title: '更新知识树索引',
+  fields: [
+    { param: 'content', title: '新索引正文', render: 'markdown' },
+    { param: 'index', title: '索引文件的变化', render: 'diff', editable: false,
+      // before 读磁盘上的旧索引，after 由新正文推出来——两者都不在参数里
+      diff: { path: 'index.md',
+              before: async exec => readIndexFile(exec),
+              after: exec => `# 知识树索引\n\n${exec.arguments.content}` } },
+  ],
+})
+```
+
+- 字符串形式的 `diff.path` 若**不是**某个参数名，就当作字面路径使用：被改的文件常常不是这次调用的参数。
+- 函数可以是 async；每个字段的解析上限是 `resolveTimeoutMs`（默认 5s）。
+- **解析失败不阻断**：函数抛错或超时，只会把**那个字段**变成一行 `⚠️ 无法解析该字段：…`，卡照常弹出、人照常决策。整个解析过程坏掉时，提案退回到"参数原样"，而不是拒绝调用。
+- wire 格式与浏览器半都没有变化：diff 的两侧本来就在帧里，前端只是照常渲染。
+- diff 的每一侧超过 `maxDiffLines`（2000 行）会被截断并标注，避免整文件 diff 变成无上限的一帧。
 
 ### 倒计时的三种结局
 
@@ -448,22 +474,22 @@ Error: HITL: no human decision arrived within 75s, so tool "glob" did not run. T
 
 ```text
 dsh-hitl/
-├── index.js                639   宿主半：服务 + 门禁 + 倒计时/持握 + SSE/决策路由 + 令牌注入
+├── index.js                666   宿主半：服务 + 门禁 + 倒计时/持握 + SSE/决策路由 + 令牌注入
 ├── client.js              1918   浏览器半：决策面板 + 帧级浮层（自包含 classic script，无 import）
 ├── lib/                          宿主半的纯逻辑：不碰 Cordis、不碰 DOM，可单独跑测试
-│   ├── protocol.js         182   帧与上行校验、上限、错误码（协议规范的唯一出处）
-│   ├── resolve.js          311   matcher 编译（名字/通配/RegExp/谓词）、挂载选项归一化与诊断
-│   ├── fields.js           244   默认提案推导、diff 配对、决策 → 模型可见文本
+│   ├── protocol.js         195   帧与上行校验、上限、错误码（协议规范的唯一出处）
+│   ├── resolve.js          363   matcher 编译（名字/通配/RegExp/谓词）、挂载选项归一化与诊断
+│   ├── fields.js           449   默认提案推导、diff 配对、计算字段解析、决策 → 模型可见文本
 │   └── pending.js          217   待决策状态机（可注入时钟）：倒计时、持握、恰好一次的结算
 ├── locale/                       插件列表里的名字与简介（形状必须是 {"meta":{...}}，见 §6.3）
 │   ├── en.json               6
 │   └── zh.json               6
 ├── docs/                         截图源文件，**故意不进 npm 包**：README 改为链接 landing page
-├── tests/                        零依赖 Node 测试，共 153 个用例
+├── tests/                        零依赖 Node 测试，共 167 个用例
 │   ├── client.test.js      818   （65）浏览器半的纯函数 + store / connection / seat
-│   ├── fields.test.js      269   （26）提案推导与决策文本
+│   ├── fields.test.js      387   （37）提案推导、计算字段与决策文本
 │   ├── pending.test.js     240   （18）状态机（注入时钟，无真实等待）
-│   ├── resolve.test.js     181   （19）matcher 与选项归一化
+│   ├── resolve.test.js     224   （22）matcher 与选项归一化
 │   ├── protocol.test.js    117   （16）帧与上行校验
 │   ├── docs.test.js        121   （5）两份 README、landing page 链接，以及上面这张表里的每个数字
 │   └── manifest.test.js     77   （4）包元数据与 locale 资源形状
@@ -505,7 +531,7 @@ dsh-hitl/
 
 ```sh
 node --check index.js client.js lib/*.js     # 语法
-npm test                                     # 153 个纯函数/状态机/通道用例，零依赖
+npm test                                     # 167 个纯函数/状态机/通道用例，零依赖
 npm run check                                # 上面两步合起来（语法 + 全部用例）
 ```
 

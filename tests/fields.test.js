@@ -3,8 +3,9 @@ import { describe, it } from 'node:test'
 
 import {
   REASON_PREFIX, buildFields, buildRequest, capReason, defaultFieldSpecs, describeDecision,
-  inferRender, isRevision, renderValue, revisionContext, revisionText,
+  hasComputed, inferRender, isRevision, renderValue, resolveFields, revisionContext, revisionText,
 } from '../lib/fields.js'
+import { LIMITS } from '../lib/protocol.js'
 import { normalizeMount } from '../lib/resolve.js'
 
 /** Normalize one mount through the same path the host half uses. */
@@ -265,5 +266,122 @@ describe('fields: decisions back to the model', () => {
     const capped = capReason('x'.repeat(20000))
     assert.equal(capped.length < 20000, true)
     assert.equal(capped.includes('已截断'), true)
+  })
+})
+
+describe('fields: computed fields', () => {
+  const call = executionOf({ path: 'notes.md', content: 'new text' })
+
+  it('takes a literal or a function as a field value', async () => {
+    const mount = mountOf({
+      fields: [
+        { param: 'content', title: '正文', render: 'markdown', editable: false, value: execution => `读到 ${execution.arguments.path}` },
+        { param: 'note', render: 'text', editable: false, value: '固定文案' },
+        { param: 'path', render: 'text', editable: false },
+      ],
+    })
+    const fields = buildFields(call, mount, await resolveFields(call, mount))
+    assert.equal(fields[0].value, '读到 notes.md')
+    assert.equal(fields[0].editable, false)
+    assert.equal(fields[1].value, '固定文案')
+    // A field without a resolver keeps reading its own argument.
+    assert.equal(fields[2].value, 'notes.md')
+  })
+
+  it('awaits an async resolver and renders a non-string result', async () => {
+    const mount = mountOf({
+      fields: [
+        { param: 'a', render: 'text', editable: false, value: async () => 'awaited' },
+        { param: 'b', render: 'text', editable: false, value: () => ({ lines: 2 }) },
+      ],
+    })
+    const fields = buildFields(call, mount, await resolveFields(call, mount))
+    assert.equal(fields[0].value, 'awaited')
+    assert.equal(fields[1].value, '{\n  "lines": 2\n}')
+  })
+
+  it('renders a computed diff against a literal path', async () => {
+    const mount = mountOf({
+      fields: [{
+        param: 'index', title: '索引变化', render: 'diff', editable: false,
+        diff: { path: 'index.md', before: async () => 'old line', after: 'content' },
+      }],
+    })
+    const [field] = buildFields(call, mount, await resolveFields(call, mount))
+    assert.equal(field.render, 'diff')
+    assert.equal(field.editable, false)
+    assert.deepEqual(field.diff, { path: 'index.md', oldText: 'old line', newText: 'new text' })
+  })
+
+  it('resolves a mount-level diff that carries no field list', async () => {
+    const mount = mountOf({ diff: { path: () => 'tree.md', before: async () => 'a', after: () => 'b' } })
+    const fields = buildFields(call, mount, await resolveFields(call, mount))
+    assert.deepEqual(fields.map(field => field.param), ['path', 'content', 'computed→computed'])
+    assert.deepEqual(fields[2].diff, { path: 'tree.md', oldText: 'a', newText: 'b' })
+  })
+
+  it('shows a failing resolver in its own field instead of blocking the gate', async () => {
+    const mount = mountOf({
+      fields: [
+        { param: 'path', render: 'text', editable: false },
+        { param: 'ghost', render: 'markdown', editable: false, value: () => { throw new Error('磁盘不可读') } },
+      ],
+    })
+    const warnings = []
+    const fields = buildFields(call, mount, await resolveFields(call, mount, { warn: message => warnings.push(message) }))
+    assert.equal(fields[0].value, 'notes.md')
+    assert.equal(fields[1].render, 'text')
+    assert.equal(fields[1].editable, false)
+    assert.equal(fields[1].value.includes('磁盘不可读'), true)
+    assert.equal(warnings.length, 1)
+  })
+
+  it('bounds a hanging resolver with the mount timeout', async () => {
+    const mount = mountOf({ resolveTimeoutMs: 20, fields: [{ param: 'slow', value: () => new Promise(() => {}) }] })
+    const resolution = await resolveFields(call, mount, { timeoutMs: mount.options.resolveTimeoutMs })
+    const [field] = buildFields(call, mount, resolution)
+    assert.equal(field.value.includes('timed out after 20ms'), true)
+  })
+
+  it('truncates a computed value at maxFieldChars', async () => {
+    const mount = mountOf({ maxFieldChars: 4, fields: [{ param: 'long', value: () => 'abcdefgh' }] })
+    const [field] = buildFields(call, mount, await resolveFields(call, mount))
+    assert.equal(field.truncated, true)
+    assert.match(field.value, /已截断，共 8 字/)
+  })
+
+  it('bounds each side of a computed diff by lines', async () => {
+    const long = Array.from({ length: LIMITS.maxDiffLines + 2 }, (_entry, index) => `L${index}`).join('\n')
+    const mount = mountOf({
+      fields: [{ param: 'big', render: 'diff', editable: false, diff: { before: () => '', after: () => long } }],
+    })
+    const [field] = buildFields(call, mount, await resolveFields(call, mount))
+    assert.equal(field.diff.newText.split('\n').length, LIMITS.maxDiffLines + 1)
+    assert.match(field.diff.newText, /已截断，另有 2 行未显示/)
+  })
+
+  it('leaves a mount without resolvers exactly as it was', async () => {
+    const mount = mountOf({ fields: [{ param: 'content', render: 'markdown' }] })
+    const resolution = await resolveFields(call, mount)
+    assert.equal(resolution.fields.size, 0)
+    assert.equal(resolution.mountDiff, undefined)
+    assert.deepEqual(buildFields(call, mount, resolution), buildFields(call, mount))
+  })
+
+  it('reports which mounts compute a field', () => {
+    assert.equal(hasComputed(mountOf({}).options), false)
+    assert.equal(hasComputed(mountOf({ fields: [{ param: 'a', value: () => 'x' }] }).options), true)
+    assert.equal(hasComputed(mountOf({ diff: { before: 'old', after: () => 'x' } }).options), true)
+    assert.equal(hasComputed(mountOf({ fields: [{ param: 'a', diff: { before: 'old', after: () => 'x' } }] }).options), true)
+  })
+
+  it('carries a resolved diff through buildRequest', async () => {
+    const mount = mountOf({
+      fields: [{ param: 'index', title: '索引变化', render: 'diff', editable: false, diff: { path: 'index.md', before: () => 'old', after: 'content' } }],
+    })
+    const request = buildRequest({
+      execution: call, mount, sessionId: 's1', id: 'r1', now: 0, resolution: await resolveFields(call, mount),
+    })
+    assert.deepEqual(request.fields[0].diff, { path: 'index.md', oldText: 'old', newText: 'new text' })
   })
 })
