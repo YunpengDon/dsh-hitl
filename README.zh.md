@@ -1,6 +1,6 @@
 # dsh-hitl · 给任意工具挂上人工决策（Human-in-the-loop）
 
-[![npm version](https://img.shields.io/npm/v/dsh-hitl)](https://www.npmjs.com/package/dsh-hitl) [![license](https://img.shields.io/npm/l/dsh-hitl)](LICENSE) [![截图](https://img.shields.io/badge/%E6%88%AA%E5%9B%BE-landing%20page-4c566a)](https://yunpengdon.github.io/dsh-hitl-landing/)
+[![npm version](https://img.shields.io/npm/v/dsh-hitl)](https://www.npmjs.com/package/dsh-hitl) [![license](https://img.shields.io/npm/l/dsh-hitl)](LICENSE) [![官网](https://img.shields.io/badge/%E5%AE%98%E7%BD%91-4c566a)](https://yunpengdon.github.io/dsh-hitl-landing/)
 
 [English](README.md) | 中文
 
@@ -10,8 +10,7 @@
 `dsh-hitl` 是 DeepSeek Harness (DSH) 的可安装插件（bundle）：**零依赖、零构建**——`index.js`（宿主半）+ `client.js`（浏览器半）+ `lib/`
 全是可直接加载的纯 JS，装上刷新一次页面就能用。
 
-**[截图与快速导览 →](https://yunpengdon.github.io/dsh-hitl-landing/)**
-决策卡、提案区三种形态、子代理请求、帧级兜底提示——全部高清，且不占包体积。
+**[访问网站](https://yunpengdon.github.io/dsh-hitl-landing/)**
 
 ## 主要功能
 

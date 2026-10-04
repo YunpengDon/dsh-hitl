@@ -1,6 +1,6 @@
 # dsh-hitl · Human-in-the-loop for any tool
 
-[![npm version](https://img.shields.io/npm/v/dsh-hitl)](https://www.npmjs.com/package/dsh-hitl) [![license](https://img.shields.io/npm/l/dsh-hitl)](LICENSE) [![screenshots](https://img.shields.io/badge/screenshots-landing%20page-4c566a)](https://yunpengdon.github.io/dsh-hitl-landing/)
+[![npm version](https://img.shields.io/npm/v/dsh-hitl)](https://www.npmjs.com/package/dsh-hitl) [![license](https://img.shields.io/npm/l/dsh-hitl)](LICENSE) [![Website](https://img.shields.io/badge/Website-4c566a)](https://yunpengdon.github.io/dsh-hitl-landing/)
 
 English | [中文](README.zh.md)
 
@@ -9,8 +9,7 @@ English | [中文](README.zh.md)
 
 `dsh-hitl` is an installable DeepSeek Harness (DSH) plugin (bundle): **zero dependencies, zero build** — `index.js` (host half) + `client.js` (browser half) + `lib/` are plain JS that loads as it is. Install it, refresh the page once, and it works.
 
-**[Screenshots and a short tour →](https://yunpengdon.github.io/dsh-hitl-landing/)**
-The decision card, the three proposal renderers, a subagent's request, and the frame-level notice — at full resolution, on a page that costs the package nothing.
+**[View Website](https://yunpengdon.github.io/dsh-hitl-landing/)**
 
 ## Features
 
