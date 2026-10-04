@@ -1,4 +1,4 @@
-# dsh-hitl · Human-in-the-loop for any tool
+# dsh-hitl · Human-in-the-loop for DeepSeek Harness
 
 [![npm version](https://img.shields.io/npm/v/dsh-hitl)](https://www.npmjs.com/package/dsh-hitl) [![license](https://img.shields.io/npm/l/dsh-hitl)](LICENSE) [![Website](https://img.shields.io/badge/Website-4c566a)](https://yunpengdon.github.io/dsh-hitl-landing/)
 
