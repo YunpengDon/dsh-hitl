@@ -1,5 +1,7 @@
 # dsh-hitl · Human-in-the-loop for any tool
 
+[![npm version](https://img.shields.io/npm/v/dsh-hitl)](https://www.npmjs.com/package/dsh-hitl) [![license](https://img.shields.io/npm/l/dsh-hitl)](LICENSE)
+
 English | [中文](README.zh.md)
 
 > **Let the agent ask you before it acts.**
@@ -370,14 +372,15 @@ dsh-hitl/
 │   ├── en.json               6
 │   └── zh.json               6
 ├── docs/                         the screenshots shown above, one set per language (-en / -cn)
-├── tests/                        zero-dependency Node tests, 151 cases in total
+├── tests/                        zero-dependency Node tests, 152 cases in total
 │   ├── client.test.js      818   (65) the browser half's pure helpers + store / connection / seat
 │   ├── fields.test.js      269   (26) proposal derivation and decision text
 │   ├── pending.test.js     240   (18) the state machine (injected clock, no real waiting)
 │   ├── resolve.test.js     162   (18) matchers and option normalization
 │   ├── protocol.test.js    117   (16) frame and uplink validation
 │   ├── docs.test.js        116   (5) the two READMEs, their links, and the numbers in this very table
-│   └── manifest.test.js     61   (3) package metadata and the locale resource shape
+│   └── manifest.test.js     74   (4) package metadata and the locale resource shape
+├── .github/workflows/release.yml     tag-triggered publish via npm trusted publishing (OIDC)
 ├── package.json             69   manifest: exports / dsh.bundle.patch / dsh.client / icon
 ├── cordis.patch.yml         17   the bundle's configuration layer (inserts the row with id `hitl`)
 ├── icon.svg                  6   the plugin list icon
@@ -408,7 +411,7 @@ dsh-hitl/
 
 ```sh
 node --check index.js client.js lib/*.js     # syntax
-npm test                                     # 151 zero-dependency cases: pure functions, state machines, the channel
+npm test                                     # 152 zero-dependency cases: pure functions, state machines, the channel
 npm run check                                # both of the above (syntax + the whole suite)
 ```
 

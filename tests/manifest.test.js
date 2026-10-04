@@ -24,6 +24,19 @@ const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const LANGUAGES = ['en', 'zh']
 
 describe('manifest: what a profile reads about this plugin', () => {
+  it('keeps a tag-triggered publish workflow wired for trusted publishing', () => {
+    const workflow = readFileSync(join(root, '.github', 'workflows', 'release.yml'), 'utf8')
+    assert.equal(workflow.includes('tags:'), true, 'the workflow must trigger on version tags')
+    assert.equal(workflow.includes('id-token: write'), true, 'OIDC publishing needs the id-token permission')
+    assert.equal(workflow.includes('contents: read'), true)
+    assert.equal(workflow.includes('npm publish'), true)
+    // Provenance is automatic under trusted publishing — but this file *talks*
+    // about that, so assert on the publish command, not on the words.
+    assert.equal(/npm publish[^\n]*--provenance/.test(workflow), false, 'no --provenance flag on the command')
+    // npm matches the configured trusted publisher against this exact filename.
+    assert.equal(workflow.includes('release.yml'), true, 'the trusted publisher is configured with this filename')
+  })
+
   it('resolves the resources the Loader asks for by name', () => {
     assert.equal(manifest.name, 'dsh-hitl')
     assert.equal(typeof manifest.description, 'string')

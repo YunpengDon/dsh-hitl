@@ -1,5 +1,7 @@
 # dsh-hitl · 给任意工具挂上人工决策（Human-in-the-loop）
 
+[![npm version](https://img.shields.io/npm/v/dsh-hitl)](https://www.npmjs.com/package/dsh-hitl) [![license](https://img.shields.io/npm/l/dsh-hitl)](LICENSE)
+
 [English](README.md) | 中文
 
 > **让 Agent 在动手之前，先问你一句。**
@@ -439,14 +441,15 @@ dsh-hitl/
 │   ├── en.json               6
 │   └── zh.json               6
 ├── docs/                         上文那些截图，中英各一套（-cn / -en）
-├── tests/                        零依赖 Node 测试，共 151 个用例
+├── tests/                        零依赖 Node 测试，共 152 个用例
 │   ├── client.test.js      818   （65）浏览器半的纯函数 + store / connection / seat
 │   ├── fields.test.js      269   （26）提案推导与决策文本
 │   ├── pending.test.js     240   （18）状态机（注入时钟，无真实等待）
 │   ├── resolve.test.js     162   （18）matcher 与选项归一化
 │   ├── protocol.test.js    117   （16）帧与上行校验
 │   ├── docs.test.js        116   （5）两份 README、互链，以及上面这张表里的每个数字
-│   └── manifest.test.js     61   （3）包元数据与 locale 资源形状
+│   └── manifest.test.js     74   （4）包元数据与 locale 资源形状
+├── .github/workflows/release.yml     tag-triggered publish via npm trusted publishing (OIDC)
 ├── package.json             69   清单：exports / dsh.bundle.patch / dsh.client / icon
 ├── cordis.patch.yml         17   bundle 的配置层（插入 id 为 hitl 的那一行）
 ├── icon.svg                  6   插件列表图标
@@ -483,7 +486,7 @@ dsh-hitl/
 
 ```sh
 node --check index.js client.js lib/*.js     # 语法
-npm test                                     # 151 个纯函数/状态机/通道用例，零依赖
+npm test                                     # 152 个纯函数/状态机/通道用例，零依赖
 npm run check                                # 上面两步合起来（语法 + 全部用例）
 ```
 

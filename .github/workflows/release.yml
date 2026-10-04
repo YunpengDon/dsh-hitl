@@ -1,0 +1,62 @@
+name: release
+
+# Publishing path: cut a version, push the tag, and this publishes it.
+#
+#   npm version patch && git push && git push --tags
+#
+# Authentication is OIDC ("npm trusted publishing"): no npm token lives in this
+# repository and none has to be rotated, and npm CLI attaches the provenance
+# attestation by itself (no `--provenance` flag needed on npm >= 11.5.1).
+#
+# One-time setup, on npmjs.com → the package → Settings → Trusted Publisher:
+#   organization/user : YunpengDon
+#   repository        : dsh-hitl
+#   workflow filename : release.yml      <- must equal this file's basename
+#   environment       : (leave empty)
+# If the filename does not match, npm refuses the publish with a 404/403.
+
+on:
+  push:
+    tags: ['v*']
+  # Manual runs publish the checked-out commit, which is how the very first
+  # trusted-publishing release can go out without a local 2FA publish.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # The OIDC token npm exchanges for a short-lived publish credential.
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Node 24 ships npm 11, which is what trusted publishing requires.
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check the tag against package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -eu
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+          echo "releasing $version from tag $GITHUB_REF_NAME"
+
+      - name: Self-checks
+        run: npm run check
+
+      - name: Publish
+        run: npm publish
