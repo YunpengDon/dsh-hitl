@@ -61,6 +61,7 @@ describe('resolve: normalizeMount', () => {
       whenUnavailable: 'reject',
       enabled: true,
       maxFieldChars: DEFAULT_OPTIONS.maxFieldChars,
+      resolveTimeoutMs: DEFAULT_OPTIONS.resolveTimeoutMs,
     })
   })
 
@@ -109,6 +110,48 @@ describe('resolve: normalizeMount', () => {
     ])
     assert.equal(warnings.length, 1)
     assert.match(warnings[0], /fields\[2\]\.render/)
+  })
+
+  it('keeps a literal or computed field value and drops an unusable one', () => {
+    const read = () => 'value'
+    const { mount, warnings } = normalizeMount({
+      tool: 'edit',
+      fields: [
+        { param: 'note', value: '固定文案' },
+        { param: 'computed', value: read },
+        { param: 'content', value: undefined, diff: { path: 'file_path', before: read, after: 'new_string' } },
+      ],
+    }, 'src')
+    assert.equal(mount.options.fields[0].value, '固定文案')
+    assert.equal(mount.options.fields[1].value, read)
+    assert.deepEqual(Object.keys(mount.options.fields[2].diff), ['before', 'after', 'path'])
+    assert.equal(mount.options.fields[2].diff.before, read)
+    assert.equal(warnings.length, 0)
+
+    const bad = normalizeMount({ tool: 'edit', fields: [{ param: 'x', value: 7 }] }, 'src')
+    assert.deepEqual(bad.mount.options.fields, [])
+    assert.equal(bad.warnings.length, 1)
+    assert.match(bad.warnings[0], /fields\[0\]\.value/)
+  })
+
+  it('drops a malformed diff instead of letting the field render as markdown', () => {
+    const bad = normalizeMount({ tool: 'edit', diff: { before: 'old_string' } }, 'src')
+    assert.equal(bad.mount.options.diff, undefined)
+    assert.equal(bad.warnings.length, 1)
+    assert.match(bad.warnings[0], /^src: diff\.before and diff\.after/)
+
+    const fieldLevel = normalizeMount({
+      tool: 'edit', fields: [{ param: 'x', diff: { before: 'a', after: 'b', path: 7 } }],
+    }, 'src')
+    assert.equal('diff' in fieldLevel.mount.options.fields[0], false)
+    assert.equal(fieldLevel.warnings.length, 1)
+    assert.match(fieldLevel.warnings[0], /fields\[0\]\.diff\.path/)
+  })
+
+  it('bounds a computed field with resolveTimeoutMs, defaulting from the protocol', () => {
+    assert.equal(normalizeMount({ tool: 'bash' }, 'src').mount.options.resolveTimeoutMs, DEFAULT_OPTIONS.resolveTimeoutMs)
+    assert.equal(normalizeMount({ tool: 'bash', resolveTimeoutMs: 250 }, 'src').mount.options.resolveTimeoutMs, 250)
+    assert.equal(normalizeMount({ tool: 'bash', resolveTimeoutMs: 0 }, 'src').mount.options.resolveTimeoutMs, DEFAULT_OPTIONS.resolveTimeoutMs)
   })
 
   it('reports a bad layout, unavailable policy, and modify mode', () => {

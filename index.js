@@ -21,7 +21,9 @@ import {
   DEFAULT_ENDPOINT, ERROR_CODES, GLOBAL_KEY, LIMITS, OUTCOMES, errorBody, frameHoldAck,
   framePing, frameRequest, frameSettled, frameSnapshot, okBody, parseUplink, sseChunk,
 } from './lib/protocol.js'
-import { buildRequest, capReason, describeDecision, isRevision, revisionContext } from './lib/fields.js'
+import {
+  buildRequest, capReason, describeDecision, hasComputed, isRevision, resolveFields, revisionContext,
+} from './lib/fields.js'
 import { DEFAULT_HOLD_GRACE_MS, createPendingRegistry } from './lib/pending.js'
 import { matchMount, mountApplies, normalizeMount, normalizeProtectList } from './lib/resolve.js'
 
@@ -234,6 +236,8 @@ export function apply(ctx, config = {}) {
       rejectFeedback: mount.options.reject.feedback,
       modify: mount.options.modify.mode,
       whenUnavailable: mount.options.whenUnavailable,
+      /** Whether this mount's proposal needs the host to compute a field. */
+      computed: hasComputed(mount.options),
     })),
     /** Every decision still waiting for a human, oldest first. */
     pending: () => registry.list().map(request => ({
@@ -315,6 +319,23 @@ export function apply(ctx, config = {}) {
     }
   }
 
+  /**
+   * Collect a mount's computed fields for one call.
+   *
+   * If the resolution itself breaks, the proposal degrades to the call's own
+   * arguments: a panel of raw parameters is still a decision the human can make,
+   * while a denied call is not. A resolver that fails on its own degrades inside
+   * `resolveFields` instead, into one field that says so.
+   */
+  async function resolutionFor(exec, mount) {
+    try {
+      return await resolveFields(exec, mount, { timeoutMs: mount.options.resolveTimeoutMs, warn })
+    } catch (error) {
+      warn(`the computed fields of tool ${JSON.stringify(exec.name)} could not be resolved: ${String(error)}`)
+      return undefined
+    }
+  }
+
   async function gate(exec, next) {
     let mount
     try {
@@ -335,7 +356,13 @@ export function apply(ctx, config = {}) {
     }
     const id = `hitl:${String(exec.callId ?? randomUUID())}`
     try {
-      const request = buildRequest({ execution: exec, mount, sessionId, id })
+      const request = buildRequest({
+        execution: exec,
+        mount,
+        sessionId,
+        id,
+        resolution: await resolutionFor(exec, mount),
+      })
       const settlement = await waitForDecision(id, request, mount, exec)
       return toPreToolDecision(exec, request, mount, settlement)
     } catch (error) {

@@ -146,6 +146,7 @@ Without `fields`, the proposal is **every parameter of this call**:
 | `whenUnavailable` | `reject` \| `wait` | `reject` | Behaviour with no browser connected: `reject` = fail-closed; `wait` = wait indefinitely, so **pair it with a `countdown`** or that call hangs until its Session ends (the host warns at mount time); see §7.1 |
 | `enabled` | boolean \| `(exec) => boolean` | `true` | Turn a mount off temporarily / make it conditional |
 | `maxFieldChars` | number | `20000` | Per-field render cap; longer values are truncated with a note |
+| `resolveTimeoutMs` | number | `5000` | Bound on resolving one **computed** field; a timeout or a throw fails that field alone, never the call |
 
 ### FieldSpec
 
@@ -154,12 +155,38 @@ Without `fields`, the proposal is **every parameter of this call**:
   render: 'markdown',        // markdown | text | diff | json | hidden
   editable: true,            // overrides the default editability
   labels: ['irreversible'],  // field-level labels
+  value: 'fixed copy',       // this field's text: a literal, or (exec) => string | Promise<string>
   diff: { before: 'old_string', after: 'new_string', path: 'file_path' } }   // used when render: 'diff'
 ```
 
 - With no `render`, a field renders as a diff when one can be configured, and as a markdown input otherwise.
 - When `fields` is given, **only** the listed fields are shown (parameters you leave out never reach the panel).
 - Config rows may shorten a spec to a bare string: `fields: ['command', { param: 'cwd', title: 'Working directory' }]`.
+
+### Computed fields: putting what the arguments do not carry on the card
+
+`diff.before` / `diff.after` / `diff.path` normally name a **parameter** (the host reads `args[name]`). Like a field's `value`, any of them may instead be a **function**: the host calls it with the pending `exec` before the card opens and uses what it returns as the text.
+
+```js
+ctx.hitl.protect('update_index', {
+  title: 'Update the knowledge-tree index',
+  fields: [
+    { param: 'content', title: 'New index text', render: 'markdown' },
+    { param: 'index', title: 'What changes in the index file', render: 'diff', editable: false,
+      // `before` reads the old index from disk, `after` derives the new file text —
+      // neither of them is one of the call's parameters
+      diff: { path: 'index.md',
+              before: async exec => readIndexFile(exec),
+              after: exec => `# Knowledge tree index\n\n${exec.arguments.content}` } },
+  ],
+})
+```
+
+- A string `diff.path` that is **not** a parameter name is used as a literal path: the file a call is about to change is often not one of its arguments.
+- Resolvers may be async; one field's resolution is bounded by `resolveTimeoutMs` (5s by default).
+- **A failed resolution never blocks the decision**: a throw or a timeout turns *that field* into one `⚠️ …could not be resolved…` line, the card still opens, and the human still decides. If the resolution machinery itself breaks, the proposal degrades to the raw arguments instead of denying the call.
+- The wire format and the browser half are unchanged: both sides of a diff always travelled in the frame; the panel just renders them.
+- Each side of a diff is cut past `maxDiffLines` (2000 lines) with a note, so a whole-file diff cannot become an unbounded frame.
 
 ### The three endings of a countdown
 
@@ -385,22 +412,22 @@ Reply: `{ ok: true, accepted: true, held?, expiresAt? }` or
 
 ```text
 dsh-hitl/
-├── index.js                639   host half: service + gate + countdown/hold + SSE & decision routes + token injection
+├── index.js                666   host half: service + gate + countdown/hold + SSE & decision routes + token injection
 ├── client.js              1918   browser half: decision panel + frame-level notice (self-contained classic script, no imports)
 ├── lib/                          the host half's pure logic: no Cordis, no DOM, testable on its own
-│   ├── protocol.js         182   frame and uplink validation, limits, error codes (the single source of the protocol)
-│   ├── resolve.js          311   matcher compilation (name/glob/RegExp/predicate), option normalization and diagnostics
-│   ├── fields.js           244   default proposal derivation, diff pairing, decision → model-visible text
+│   ├── protocol.js         195   frame and uplink validation, limits, error codes (the single source of the protocol)
+│   ├── resolve.js          363   matcher compilation (name/glob/RegExp/predicate), option normalization and diagnostics
+│   ├── fields.js           449   default proposal derivation, diff pairing, computed-field resolution, decision → model-visible text
 │   └── pending.js          217   the pending-decision state machine (injectable clock): countdown, hold, settle-once
 ├── locale/                       the plugin list's name and description (shape must be {"meta":{...}}, see §6.3)
 │   ├── en.json               6
 │   └── zh.json               6
 ├── docs/                         screenshot sources, deliberately NOT shipped: the README links the landing page instead
-├── tests/                        zero-dependency Node tests, 153 cases in total
+├── tests/                        zero-dependency Node tests, 167 cases in total
 │   ├── client.test.js      818   (65) the browser half's pure helpers + store / connection / seat
-│   ├── fields.test.js      269   (26) proposal derivation and decision text
+│   ├── fields.test.js      387   (37) proposal derivation, computed fields and decision text
 │   ├── pending.test.js     240   (18) the state machine (injected clock, no real waiting)
-│   ├── resolve.test.js     181   (19) matchers and option normalization
+│   ├── resolve.test.js     224   (22) matchers and option normalization
 │   ├── protocol.test.js    117   (16) frame and uplink validation
 │   ├── docs.test.js        121   (5) the two READMEs, the landing-page link, and the numbers in this very table
 │   └── manifest.test.js     77   (4) package metadata and the locale resource shape
@@ -436,7 +463,7 @@ dsh-hitl/
 
 ```sh
 node --check index.js client.js lib/*.js     # syntax
-npm test                                     # 153 zero-dependency cases: pure functions, state machines, the channel
+npm test                                     # 167 zero-dependency cases: pure functions, state machines, the channel
 npm run check                                # both of the above (syntax + the whole suite)
 ```
 
