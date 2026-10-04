@@ -36,7 +36,10 @@ English | [中文](README.zh.md)
 ## 1. Install
 
 ```sh
-# From a directory (handiest while developing: restart dsh after code changes)
+# Straight from GitHub (nothing to build)
+dsh plugin --profile <your profile> add github:YunpengDon/dsh-hitl
+
+# From a local directory (handiest while developing: restart dsh after code changes)
 dsh plugin --profile <your profile> add /path/to/dsh-hitl
 
 # Or through the GUI: Settings → Plugins → install bundle

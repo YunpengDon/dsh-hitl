@@ -40,6 +40,9 @@
 ## 1. 安装
 
 ```sh
+# 直接从 GitHub 装（无需构建）
+dsh plugin --profile <你的 profile> add github:YunpengDon/dsh-hitl
+
 # 目录方式（开发期最方便：改了代码重启 dsh 即可）
 dsh plugin --profile <你的 profile> add /path/to/dsh-hitl
 
