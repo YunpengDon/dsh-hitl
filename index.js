@@ -107,7 +107,14 @@ export function apply(ctx, config = {}) {
   const clients = new Set()
   const resolvers = new Map()
   const cleanups = new Map()
-  const revisions = new Map()
+  // Revision context for `allow-and-inform`, keyed by the execution object the
+  // pipeline carries from `tools/pre-execute` through `tools/post-execute`.
+  // A WeakMap, not a callId-keyed Map: if a call is allowed and then never
+  // reaches post-execute (an aborted turn, a process torn down mid-execution),
+  // a Map entry would outlive the call for the rest of the process. Keyed by
+  // the execution itself, the entry dies with the call that owns it, so there
+  // is nothing to leak and nothing to remember to clean up.
+  const revisions = new WeakMap()
 
   const registry = createPendingRegistry({
     holdGraceMs: positiveInteger(options.holdGraceMs, DEFAULT_HOLD_GRACE_MS),
@@ -293,7 +300,9 @@ export function apply(ctx, config = {}) {
     if (settlement.decision.kind === 'cancel') return { kind: 'cancel' }
     const revising = isRevision(settlement.decision)
     if (revising && mount.options.modify.mode === 'allow-and-inform' && settlement.source === OUTCOMES.user) {
-      if (exec.callId !== undefined) revisions.set(String(exec.callId), { request, decision: settlement.decision })
+      // The call is about to run with its original arguments; the edit rides
+      // along as context on the result instead (see the post-execute listener).
+      revisions.set(exec, { request, decision: settlement.decision })
       return { kind: 'allow' }
     }
     const info = settlement.source === OUTCOMES.timeout
@@ -342,17 +351,17 @@ export function apply(ctx, config = {}) {
 
   /**
    * Hand the user's revision to the model next to the result it approved, in
-   * the `allow-and-inform` modify mode. The message is built to the shape
-   * `createUserMessage` produces, because a plain bundle cannot import that
-   * factory; `source.kind` is the standard `user` one.
+   * the `allow-and-inform` modify mode. Lookup is by the execution object, so a
+   * call that never reaches this stage costs nothing but its own lifetime; the
+   * delete keeps a second post-execute for the same execution from attaching
+   * the same context twice.
    */
   ctx.on('tools/post-execute', async (exec, result, next) => {
     const decision = await next()
-    if (revisions.size === 0 || exec.callId === undefined) return decision
-    const key = String(exec.callId)
-    const revision = revisions.get(key)
+    const revision = revisions.get(exec)
     if (revision === undefined) return decision
-    revisions.delete(key)
+    revisions.delete(exec)
+    const label = exec.callId === undefined ? String(exec.name) : String(exec.callId)
     try {
       const message = {
         id: randomUUID(),
@@ -362,7 +371,7 @@ export function apply(ctx, config = {}) {
       }
       return { ...decision, additionalContexts: [...(decision.additionalContexts ?? []), message] }
     } catch (error) {
-      warn(`the revision context for ${key} was dropped: ${String(error)}`)
+      warn(`the revision context for ${label} was dropped: ${String(error)}`)
       return decision
     }
   })
@@ -622,7 +631,8 @@ export function apply(ctx, config = {}) {
       }
     }
     mounts.length = 0
-    revisions.clear()
+    // `revisions` is a WeakMap: shutdown has nothing to clear, and a call that
+    // never came back takes its own entry with it.
     resolvers.clear()
     cleanups.clear()
   }, 'dsh-hitl: shutdown')

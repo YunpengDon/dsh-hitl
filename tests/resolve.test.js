@@ -79,6 +79,25 @@ describe('resolve: normalizeMount', () => {
     assert.match(warnings[0], /countdown.seconds/)
   })
 
+  it('warns when a mount waits forever with nothing to end the wait', () => {
+    // Fail-open plus no deadline is legal, and it blocks an unattended call for
+    // as long as its session lives. The mount is still installed; the warning is
+    // the whole point, because the first unattended run must not be the discovery.
+    const open = normalizeMount({ tool: 'bash', whenUnavailable: 'wait' }, 'src')
+    assert.equal(open.ok, true)
+    assert.equal(open.mount.options.whenUnavailable, 'wait')
+    assert.equal(open.warnings.length, 1)
+    assert.match(open.warnings[0], /whenUnavailable: wait without a countdown/)
+
+    // A deadline is what bounds it, so the pairing is silent — and so is the
+    // fail-closed default, which needs no deadline to be safe.
+    const bounded = normalizeMount({ tool: 'bash', whenUnavailable: 'wait', countdown: { seconds: 300, action: 'reject' } }, 'src')
+    assert.equal(bounded.warnings.length, 0)
+    const closed = normalizeMount({ tool: 'bash' }, 'src')
+    assert.equal(closed.mount.options.whenUnavailable, 'reject')
+    assert.equal(closed.warnings.length, 0)
+  })
+
   it('normalizes field entries and drops invalid ones', () => {
     const { mount, warnings } = normalizeMount({
       tool: 'edit',
