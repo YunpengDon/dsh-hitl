@@ -36,6 +36,9 @@ English | [中文](README.zh.md)
 ## 1. Install
 
 ```sh
+# From npm (the canonical install)
+dsh plugin --profile <your profile> add dsh-hitl
+
 # Straight from GitHub (nothing to build)
 dsh plugin --profile <your profile> add github:YunpengDon/dsh-hitl
 

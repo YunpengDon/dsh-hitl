@@ -40,6 +40,9 @@
 ## 1. 安装
 
 ```sh
+# 从 npm 装（推荐方式）
+dsh plugin --profile <你的 profile> add dsh-hitl
+
 # 直接从 GitHub 装（无需构建）
 dsh plugin --profile <你的 profile> add github:YunpengDon/dsh-hitl
 
