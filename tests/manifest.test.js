@@ -24,15 +24,18 @@ const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const LANGUAGES = ['en', 'zh']
 
 describe('manifest: what a profile reads about this plugin', () => {
-  it('keeps a tag-triggered publish workflow wired for trusted publishing', () => {
+  it('keeps the tag-triggered release on stage-only trusted publishing', () => {
     const workflow = readFileSync(join(root, '.github', 'workflows', 'release.yml'), 'utf8')
-    assert.equal(workflow.includes('tags:'), true, 'the workflow must trigger on version tags')
+    assert.equal(workflow.includes("tags: ['v*']"), true, 'the workflow must trigger on version tags')
     assert.equal(workflow.includes('id-token: write'), true, 'OIDC publishing needs the id-token permission')
     assert.equal(workflow.includes('contents: read'), true)
-    assert.equal(workflow.includes('npm publish'), true)
+    // Stage-only: the workflow may upload a release, but a maintainer approves
+    // it with 2FA before it becomes public, so it must never publish directly.
+    assert.equal(/run: npm stage publish/.test(workflow), true, 'the release step must stage')
+    assert.equal(/run: npm publish\b/.test(workflow), false, 'a direct publish would need "publish directly" granted')
     // Provenance is automatic under trusted publishing — but this file *talks*
-    // about that, so assert on the publish command, not on the words.
-    assert.equal(/npm publish[^\n]*--provenance/.test(workflow), false, 'no --provenance flag on the command')
+    // about that, so assert on the command, not on the words.
+    assert.equal(/npm stage publish[^\n]*--provenance/.test(workflow), false, 'no --provenance flag on the command')
     // npm matches the configured trusted publisher against this exact filename.
     assert.equal(workflow.includes('release.yml'), true, 'the trusted publisher is configured with this filename')
   })

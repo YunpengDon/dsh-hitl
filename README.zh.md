@@ -448,7 +448,7 @@ dsh-hitl/
 │   ├── resolve.test.js     162   （18）matcher 与选项归一化
 │   ├── protocol.test.js    117   （16）帧与上行校验
 │   ├── docs.test.js        116   （5）两份 README、互链，以及上面这张表里的每个数字
-│   └── manifest.test.js     74   （4）包元数据与 locale 资源形状
+│   └── manifest.test.js     77   （4）包元数据与 locale 资源形状
 ├── .github/workflows/release.yml     tag-triggered publish via npm trusted publishing (OIDC)
 ├── package.json             69   清单：exports / dsh.bundle.patch / dsh.client / icon
 ├── cordis.patch.yml         17   bundle 的配置层（插入 id 为 hitl 的那一行）

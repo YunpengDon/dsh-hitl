@@ -379,7 +379,7 @@ dsh-hitl/
 │   ├── resolve.test.js     162   (18) matchers and option normalization
 │   ├── protocol.test.js    117   (16) frame and uplink validation
 │   ├── docs.test.js        116   (5) the two READMEs, their links, and the numbers in this very table
-│   └── manifest.test.js     74   (4) package metadata and the locale resource shape
+│   └── manifest.test.js     77   (4) package metadata and the locale resource shape
 ├── .github/workflows/release.yml     tag-triggered publish via npm trusted publishing (OIDC)
 ├── package.json             69   manifest: exports / dsh.bundle.patch / dsh.client / icon
 ├── cordis.patch.yml         17   the bundle's configuration layer (inserts the row with id `hitl`)
