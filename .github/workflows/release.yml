@@ -1,6 +1,8 @@
 name: release
 
 # Publishing path: cut a version, push the tag, and this stages it.
+# Release mechanics, the npm-side checklist, and the traps behind every
+# non-obvious line below: docs/npm-release.md
 #
 #   npm version patch && git push && git push --tags
 #
