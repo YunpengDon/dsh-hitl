@@ -1,0 +1,17 @@
+# The dsh-hitl bundle patch: one host row.
+#
+# The row's `config.protect` list mounts HITL on tools without writing code:
+# each entry is { tool, ...hitlOptions } and mirrors ctx.hitl.protect(tool, options).
+# Plugins mount through the `hitl` service instead:
+#
+#   ctx.inject(['hitl'], (ctx) => {
+#     ctx.hitl.protect('bash', { countdown: { seconds: 30, action: 'reject' } })
+#   })
+#
+# A patch replaces the whole `config` of a row it overrides, so keep every key
+# this row owns when you edit it from a later layer.
+- insert:
+    - id: hitl
+      name: 'dsh-hitl'
+      config:
+        protect: []

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "HITL human decision",
+    "description": "Mount a human decision on any tool: title, proposal (diff / text / markdown), approve / modify / reject, and a configurable countdown."
+  }
+}

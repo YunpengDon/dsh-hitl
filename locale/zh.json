@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "HITL 人工决策",
+    "description": "给任意工具挂上人工决策：标题 + 待决策提案（diff / text / markdown）+ 同意·修改·拒绝 + 可配置倒计时。"
+  }
+}
