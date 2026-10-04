@@ -1,6 +1,6 @@
 # dsh-hitl · 给任意工具挂上人工决策（Human-in-the-loop）
 
-[![npm version](https://img.shields.io/npm/v/dsh-hitl)](https://www.npmjs.com/package/dsh-hitl) [![license](https://img.shields.io/npm/l/dsh-hitl)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/dsh-hitl)](https://www.npmjs.com/package/dsh-hitl) [![license](https://img.shields.io/npm/l/dsh-hitl)](LICENSE) [![截图](https://img.shields.io/badge/%E6%88%AA%E5%9B%BE-landing%20page-4c566a)](https://yunpengdon.github.io/dsh-hitl-landing/)
 
 [English](README.md) | 中文
 
@@ -10,7 +10,8 @@
 `dsh-hitl` 是 DeepSeek Harness (DSH) 的可安装插件（bundle）：**零依赖、零构建**——`index.js`（宿主半）+ `client.js`（浏览器半）+ `lib/`
 全是可直接加载的纯 JS，装上刷新一次页面就能用。
 
-![一张完整的决策卡：标题 + 待决策提案 + 同意/修改/拒绝 + 倒计时](docs/01-panel-cn.png)
+**[截图与快速导览 →](https://yunpengdon.github.io/dsh-hitl-landing/)**
+决策卡、提案区三种形态、子代理请求、帧级兜底提示——全部高清，且不占包体积。
 
 ## 主要功能
 
@@ -21,7 +22,6 @@
 - **带反馈文本的拒绝**：【拒绝】可以带一个**反馈栏**，在反馈栏中写下的意见会随拒绝一起交给 Agent——它知道"不要做"，也知道"为什么不要做"；
 - **支持倒计时配置**：可配置**倒计时**与三种结局（**自动同意 / 自动拒绝 / 把超时事件反馈给 Agent**）；
 
-![提案区三种形态同框：并排 diff / 文本输入框 / markdown 的预览与编辑](docs/02-fields-cn.png)
 
 ## 为DSH定制的适配
 
@@ -30,12 +30,12 @@
 「来自子代理会话 xxx」+【前往该会话】。
 （跨进程后端不进这道门禁，见 §6.1。）
 
-![主对话里的卡片：标着「来自子代理会话」+【前往该会话】](docs/03-subagent-cn.png)
+[在 landing page 上看这张卡 →](https://yunpengdon.github.io/dsh-hitl-landing/)
 
 **不在对话界面上时，支持弹出迷你批准请求** 切到插件页、打开设置、甚至没选会话时，页面顶部会浮出一条提醒事项，减少用户不在对话页时HITL对流程的阻塞。
 （条数、工具名、来源会话、剩余时间 +【同意】【拒绝】【前往该会话】）。
 
-![设置面板之上浮着的兜底提醒条](docs/04-overlay-cn.png)
+[在 landing page 上看这条浮层 →](https://yunpengdon.github.io/dsh-hitl-landing/)
 
 ---
 
@@ -157,7 +157,7 @@ export function apply(ctx) {
 | `reject.feedbackPrompt` | string | 内置文案 | 反馈栏 placeholder |
 | `reject.requireFeedback` | boolean | `false` | 反馈必填（为空时拒绝按钮会提示） |
 | `modify.mode` | `revise-request` \| `allow-and-inform` | `revise-request` | 用户改了文本后点【修改】的语义，见 §5 |
-| `whenUnavailable` | `reject` \| `wait` | `reject` | 没有任何浏览器连接时的行为（`reject` = fail-closed） |
+| `whenUnavailable` | `reject` \| `wait` | `reject` | 没有任何浏览器连接时的行为：`reject` = fail-closed；`wait` = 一直等，**务必配 `countdown`**，否则那次调用会挂到会话结束（挂载时宿主会给 `dsh-hitl:` 警告），见 §7.1 |
 | `enabled` | boolean \| `(exec) => boolean` | `true` | 临时关闭 / 条件挂载 |
 | `maxFieldChars` | number | `20000` | 单字段渲染上限，超出会截断并提示 |
 
@@ -342,6 +342,21 @@ Error: HITL: no human decision arrived within 75s, so tool "glob" did not run. T
   想让它在无人值守时一直等，把 `whenUnavailable` 设为 `wait`。
 - 插件在没有任何 Web 服务的组合里（headless/TUI）**仍然激活并继续拦**——"没有 UI 就不拦"不是本插件的语义。
 
+### 7.1 安全边界：HITL 拦得住什么、拦不住什么
+
+- **它拦的是"这一次调用在真正执行之前"，不是世界状态。** 如果工具在自己的执行层已经产生了副作用（并发竞态、异步落盘、
+  已经发出去的外部请求），拒绝只能阻止"接下来"，回滚不了"已经"——**HITL 不是事务，也不是沙箱**。
+- 所以实际安全程度取决于两件事：**① 你的 matcher 覆盖了多危险的操作；② 工具是否把不可逆动作放在最后一刻。**
+  把 `bash` / `write` / `edit` 这类"入口即危险"的工具挂上是对的；若某个工具的风险要到执行中途才出现，HITL 只能替你决定"要不要开始"。
+- **用户的同意 ≠ 越权**：同意之后沙箱、guard、hooks、审批照常随后生效（§8）；反过来，别的执行前策略也可能**先于**本插件拒绝——
+  实测过一次：`fs-observation-policy` 在用户点【同意】之前就把调用挡了，HITL 连面板都没弹（见 §8）。
+- **`whenUnavailable: wait` 是 fail-open**：没有任何浏览器连接时会一直等，没配 `countdown` 就是等到会话结束。
+  想让"无人值守也不卡死"，用默认的 `reject`，或者 `wait` + `countdown`（挂载时宿主会对这种组合给出警告）。
+- **本机信任边界**：决策通道与 `/status` 都只认回环地址。同机任意进程可以读 `/status`，它只含**挂载列表**与**待决策的
+  工具名 / 会话 id / 剩余毫秒 / 是否暂停**——**没有工具参数，也没有令牌**。要把这个口子量准：同机进程本来就能读
+  `~/.dsh/sessions/**` 的会话日志，而那里有完整的工具参数，所以 `/status` 的暴露面是它严格更小的子集。
+  这个口子是有意保留的：没有它，在终端里回答"HITL 现在拦着什么"就只能靠翻页面。
+
 ---
 
 ## 8. 与其他执行前策略的关系
@@ -349,6 +364,9 @@ Error: HITL: no human decision arrived within 75s, so tool "glob" did not run. T
 - 本插件用 `tools/pre-execute` 且 `prepend: true`，也就是**先问人**；用户同意后，
   沙箱、guard、hooks、审批等其它策略照常随后生效。**用户的同意不等于越权**。
 - 因此可能出现"用户同意了，但工具仍被沙箱/守卫拒绝"——这是设计使然，不是 bug。
+- **反过来也成立**：别的执行前策略可能在**本插件之前**就拒绝，此时 HITL 面板根本不会出现——所以"没弹面板就直接执行了/就失败了"
+  两种现象都要先看别的策略。实测过一次：`fs-observation-policy` 要求"重写已删除文件前先重读"，
+  它在用户点【同意】**之后**把调用挡了下来（面板照常弹过），也在另一轮里**先于**本插件直接拒绝（面板没弹）。
 - 本插件只做"执行前问人"，不改变工具参数、不改变工具结果。
 
 ---
@@ -356,6 +374,7 @@ Error: HITL: no human decision arrived within 75s, so tool "glob" did not run. T
 ## 9. 已知限制
 
 - **不能改写工具参数**（见 §5），所以【修改】默认走"拒绝并交回修改内容"。
+- **HITL 不是副作用边界**（见 §7.1）：它拦的是"调用开始之前"，回滚不了已经发生的副作用；安全性取决于 matcher 覆盖面与工具自身的设计。
 - **挂载文案不本地化**：`title` / `labels` / 字段标题都是挂载方给的字符串，本插件不翻译，也不接受 `{zh, en}` 映射（见 §6.3）。
 - **不写会话审计事件**：DSH 不允许插件追加新的事件类型，决策痕迹只存在于工具结果（和 `allow-and-inform` 的那条 user 消息）里。
 - **只有 Web 界面有面板**：ACP/TUI/headless 下按 `whenUnavailable` 处理（默认拒绝）。
@@ -430,29 +449,30 @@ Error: HITL: no human decision arrived within 75s, so tool "glob" did not run. T
 
 ```text
 dsh-hitl/
-├── index.js                629   宿主半：服务 + 门禁 + 倒计时/持握 + SSE/决策路由 + 令牌注入
+├── index.js                639   宿主半：服务 + 门禁 + 倒计时/持握 + SSE/决策路由 + 令牌注入
 ├── client.js              1918   浏览器半：决策面板 + 帧级浮层（自包含 classic script，无 import）
 ├── lib/                          宿主半的纯逻辑：不碰 Cordis、不碰 DOM，可单独跑测试
 │   ├── protocol.js         182   帧与上行校验、上限、错误码（协议规范的唯一出处）
-│   ├── resolve.js          302   matcher 编译（名字/通配/RegExp/谓词）、挂载选项归一化与诊断
+│   ├── resolve.js          311   matcher 编译（名字/通配/RegExp/谓词）、挂载选项归一化与诊断
 │   ├── fields.js           244   默认提案推导、diff 配对、决策 → 模型可见文本
 │   └── pending.js          217   待决策状态机（可注入时钟）：倒计时、持握、恰好一次的结算
 ├── locale/                       插件列表里的名字与简介（形状必须是 {"meta":{...}}，见 §6.3）
 │   ├── en.json               6
 │   └── zh.json               6
-├── docs/                         上文那些截图，中英各一套（-cn / -en）
-├── tests/                        零依赖 Node 测试，共 152 个用例
+├── docs/                         截图源文件，**故意不进 npm 包**：README 改为链接 landing page
+├── tests/                        零依赖 Node 测试，共 153 个用例
 │   ├── client.test.js      818   （65）浏览器半的纯函数 + store / connection / seat
 │   ├── fields.test.js      269   （26）提案推导与决策文本
 │   ├── pending.test.js     240   （18）状态机（注入时钟，无真实等待）
-│   ├── resolve.test.js     162   （18）matcher 与选项归一化
+│   ├── resolve.test.js     181   （19）matcher 与选项归一化
 │   ├── protocol.test.js    117   （16）帧与上行校验
-│   ├── docs.test.js        116   （5）两份 README、互链，以及上面这张表里的每个数字
+│   ├── docs.test.js        121   （5）两份 README、landing page 链接，以及上面这张表里的每个数字
 │   └── manifest.test.js     77   （4）包元数据与 locale 资源形状
 ├── .github/workflows/release.yml     tag-triggered publish via npm trusted publishing (OIDC)
-├── package.json             69   清单：exports / dsh.bundle.patch / dsh.client / icon
+├── package.json             68   清单：exports / dsh.bundle.patch / dsh.client / icon
 ├── cordis.patch.yml         17   bundle 的配置层（插入 id 为 hitl 的那一行）
 ├── icon.svg                  6   插件列表图标
+├── LICENSE                       MIT
 ├── README.md                     本文档（英文版）
 └── README.zh.md                  本文档的中文版
 ```
@@ -464,7 +484,7 @@ dsh-hitl/
 | `index.js`、`lib/*.js` | 宿主半（Node） | 必须**重启 dsh**。Node 的 ESM 模块缓存不会因为"禁用→启用这一行"而失效 |
 | `client.js` | 浏览器半 | **客户端热重载**自动拾取（宿主每 500ms stat 一次各行的 client 产物并广播 `/plugins/events`），不用刷新页面 |
 | `locale/*.json` | 插件列表元数据 | 插件管理器重读元数据时生效（打开插件页 / 重启 dsh） |
-| `docs/*.png` | 文档 | README 渲染时 |
+| `docs/*.png` | 截图源文件 | 只留在仓库里；发布的包里不再包含（见附录说明） |
 | `package.json`、`cordis.patch.yml` | 清单与配置层 | 需要重启或重新加载该行；已安装包不会被就地替换 |
 | `tests/*.js` | 开发期 | 不参与运行，只由 `npm test` / `node --test` 执行 |
 
@@ -486,7 +506,7 @@ dsh-hitl/
 
 ```sh
 node --check index.js client.js lib/*.js     # 语法
-npm test                                     # 152 个纯函数/状态机/通道用例，零依赖
+npm test                                     # 153 个纯函数/状态机/通道用例，零依赖
 npm run check                                # 上面两步合起来（语法 + 全部用例）
 ```
 

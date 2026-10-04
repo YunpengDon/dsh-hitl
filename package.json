@@ -39,7 +39,6 @@
     "lib",
     "tests",
     "locale",
-    "docs",
     "icon.svg",
     "cordis.patch.yml",
     "README.md",

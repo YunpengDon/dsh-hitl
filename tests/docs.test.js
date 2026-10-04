@@ -15,6 +15,8 @@ import { fileURLToPath } from 'node:url'
  */
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
+const LANDING_PAGE = 'https://yunpengdon.github.io/dsh-hitl-landing/'
+
 /** The English README is the package's front page; the Chinese one is its twin. */
 const READMES = [
   { language: 'en', file: 'README.md', other: 'README.zh.md', suffix: '-en' },
@@ -62,21 +64,22 @@ describe('docs: the English and Chinese READMEs', () => {
     }
   })
 
-  it('shows every screenshot, and only its own language', () => {
-    const referenced = new Set()
-    const available = new Set(readdirSync(join(root, 'docs')))
+  it('sends the reader to the landing page instead of shipping screenshots', () => {
+    // The four screenshots used to be the bulk of the published tarball. They
+    // live on the landing page now (its own repository carries them, in both
+    // languages), so the READMEs must link it and must not reference a local
+    // copy — and the package must not carry one either.
+    const manifest = JSON.parse(read('package.json'))
+    assert.equal(manifest.files.includes('docs'), false, 'screenshots must stay out of the tarball')
     for (const readme of READMES) {
-      const images = [...read(readme.file).matchAll(/!\[[^\]]*\]\((docs\/[^)]+)\)/g)].map(match => match[1])
-      assert.equal(images.length, 4, `${readme.file} must place all four screenshots`)
-      for (const image of images) {
-        const name = image.slice('docs/'.length)
-        assert.equal(available.has(name), true, `${readme.file} references a missing screenshot: ${image}`)
-        assert.equal(name.endsWith(`${readme.suffix}.png`), true, `${readme.file} must use its ${readme.suffix} screenshots`)
-        referenced.add(name)
-      }
-    }
-    for (const name of available) {
-      assert.equal(referenced.has(name), true, `docs/${name} is shipped but never shown`)
+      const text = read(readme.file)
+      assert.equal(text.includes(LANDING_PAGE), true, `${readme.file} must link the landing page`)
+      assert.equal(
+        /!\[[^\]]*\]\(docs\//.test(text), false,
+        `${readme.file} must not embed a local screenshot`,
+      )
+      const header = text.split('\n').slice(0, 8).join('\n')
+      assert.equal(header.includes(LANDING_PAGE), true, `${readme.file} must offer the tour near the top`)
     }
   })
 
@@ -108,9 +111,11 @@ describe('docs: the English and Chinese READMEs', () => {
     }
   })
 
-  it('keeps the screenshot folder shipped', () => {
+  it('publishes both READMEs and keeps the screenshot sources in the repository only', () => {
     const manifest = JSON.parse(read('package.json'))
-    assert.equal(manifest.files.includes('docs'), true, '`docs` must be published with the screenshots')
     assert.equal(manifest.files.includes('README.zh.md'), true, 'the Chinese README must be published too')
+    // The landing page's own repository carries the screenshots, so a second
+    // copy inside the package would only double the download for every install.
+    assert.equal(manifest.files.includes('docs'), false, 'screenshot sources must stay out of the tarball')
   })
 })

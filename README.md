@@ -1,6 +1,6 @@
 # dsh-hitl · Human-in-the-loop for any tool
 
-[![npm version](https://img.shields.io/npm/v/dsh-hitl)](https://www.npmjs.com/package/dsh-hitl) [![license](https://img.shields.io/npm/l/dsh-hitl)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/dsh-hitl)](https://www.npmjs.com/package/dsh-hitl) [![license](https://img.shields.io/npm/l/dsh-hitl)](LICENSE) [![screenshots](https://img.shields.io/badge/screenshots-landing%20page-4c566a)](https://yunpengdon.github.io/dsh-hitl-landing/)
 
 English | [中文](README.zh.md)
 
@@ -9,7 +9,8 @@ English | [中文](README.zh.md)
 
 `dsh-hitl` is an installable DeepSeek Harness (DSH) plugin (bundle): **zero dependencies, zero build** — `index.js` (host half) + `client.js` (browser half) + `lib/` are plain JS that loads as it is. Install it, refresh the page once, and it works.
 
-![A complete decision card: title, pending proposal, approve/modify/reject buttons, and a countdown](docs/01-panel-en.png)
+**[Screenshots and a short tour →](https://yunpengdon.github.io/dsh-hitl-landing/)**
+The decision card, the three proposal renderers, a subagent's request, and the frame-level notice — at full resolution, on a page that costs the package nothing.
 
 ## Features
 
@@ -20,18 +21,17 @@ English | [中文](README.zh.md)
 - **Rejection with feedback**: 【Reject】 can carry a **feedback box**, and what you write there reaches the agent together with the rejection — it knows "don't do it" *and* "why not";
 - **Configurable countdown**: a **countdown** plus three endings (**approve automatically / reject automatically / report the timeout to the agent**).
 
-![The three proposal renderers in one card: a split diff, a text input, and markdown preview with edit](docs/02-fields-en.png)
 
 ## Made for DSH
 
 **Subagent pass-through: a tool call inside a subagent raises its approval request in the main conversation too.** Every tool call inside an in-process subagent (`spawn` / `fork`) goes through the same gate — the request is filed **both** under the child Session that made it and under the Session you are currently looking at: whichever conversation you are in, the card can appear there, labelled 「from subagent Session xxx」 with an 【Open that Session】 button.
 (Out-of-process backends never reach this gate — see §6.1.)
 
-![A card in the main conversation, labelled as coming from a subagent Session, with a jump button](docs/03-subagent-en.png)
+[See this card on the landing page →](https://yunpengdon.github.io/dsh-hitl-landing/)
 
 **A mini approval request even when you are not in a conversation.** Switch to the plugins page, open settings, or select no Session at all, and a notice floats at the top of the page, so HITL does not have to block the run while you are elsewhere (count, tool name, source Session, remaining time + 【Approve】【Reject】【Open that Session】).
 
-![The fallback notice floating above the settings modal](docs/04-overlay-en.png)
+[See the notice on the landing page →](https://yunpengdon.github.io/dsh-hitl-landing/)
 
 ---
 
@@ -144,7 +144,7 @@ Without `fields`, the proposal is **every parameter of this call**:
 | `reject.feedbackPrompt` | string | built-in copy | Feedback box placeholder |
 | `reject.requireFeedback` | boolean | `false` | Feedback is required (an empty box is refused with a hint) |
 | `modify.mode` | `revise-request` \| `allow-and-inform` | `revise-request` | What 【Modify】 means after an edit; see §5 |
-| `whenUnavailable` | `reject` \| `wait` | `reject` | Behaviour with no browser connected (`reject` = fail-closed) |
+| `whenUnavailable` | `reject` \| `wait` | `reject` | Behaviour with no browser connected: `reject` = fail-closed; `wait` = wait indefinitely, so **pair it with a `countdown`** or that call hangs until its Session ends (the host warns at mount time); see §7.1 |
 | `enabled` | boolean \| `(exec) => boolean` | `true` | Turn a mount off temporarily / make it conditional |
 | `maxFieldChars` | number | `20000` | Per-field render cap; longer values are truncated with a note |
 
@@ -276,12 +276,36 @@ The panel follows the **application's current language** — not the mounting pl
 - **With no browser connected the default is fail-closed**: a tool mounted behind HITL is rejected and the model sees `Error: HITL: no browser is connected to decide, so tool "x" did not run (fail-closed).` Set `whenUnavailable` to `wait` if it should wait forever in unattended runs instead.
 - In a composition with no Web service at all (headless/TUI) the plugin **stays active and keeps gating** — "no UI, therefore no gate" is not this plugin's semantics.
 
+### 7.1 The security boundary: what HITL stops and what it cannot
+
+- **It stops a call from *starting*; it does not stop the world.** If a tool has already produced a side effect inside its own
+  execution layer (a concurrent race, an asynchronous write, a request already sent), a rejection prevents "next", never "already" —
+  **HITL is neither a transaction nor a sandbox**.
+- So how safe you actually are depends on two things: **① how dangerous the operations your matcher covers are; ② whether the tool
+  puts its irreversible step last.** Mounting `bash` / `write` / `edit` — tools that are dangerous the moment they start — is the
+  right use. If a tool only reveals its risk halfway through, HITL can only help you decide whether to begin.
+- **A human's approval is not a privilege escalation**: the sandbox, guards, hooks and approval still run afterwards (§8); and the
+  reverse holds too — another pre-execution policy can refuse *before* this plugin is even asked. That was measured once:
+  `fs-observation-policy` stopped a call before the human pressed 【Approve】, so no HITL panel ever appeared (§8).
+- **`whenUnavailable: wait` is fail-open**: with no browser connected the call simply waits, and without a `countdown` it waits until
+  its Session ends. Use the fail-closed default (`reject`) when an unattended run must not stall, or pair `wait` with a `countdown`
+  (the host warns at mount time when you do not).
+- **The local trust boundary**: the decision channel and `/status` answer loopback addresses only. Any process on this machine can
+  read `/status`, which carries the **mount list** and, per pending decision, the **tool name / Session id / remaining milliseconds /
+  hold state** — **no tool arguments and no token**. To size that hole precisely: a local process can already read the session logs
+  under `~/.dsh/sessions/**`, which do contain every tool argument, so `/status` exposes a strictly smaller subset of what is already
+  readable locally. The hole is deliberate: without it, "what is HITL holding right now?" could only be answered by opening the page.
+
 ---
 
 ## 8. Relationship to other pre-execution policies
 
 - This plugin listens on `tools/pre-execute` with `prepend: true`, i.e. **ask the human first**; once the human agrees, the sandbox, guards, hooks, approval, and every other policy still run afterwards. **A human's approval is not a privilege escalation.**
 - So "the human approved but the sandbox or a guard still refused" is by design, not a bug.
+- **The reverse holds too**: another pre-execution policy can refuse **before** this plugin is ever asked, in which case no HITL panel
+  appears at all — so "it ran (or failed) without asking me" is a question for the other policies first. Measured once:
+  `fs-observation-policy` demands a re-read before overwriting a deleted file, and it stopped a call both *after* the human pressed
+  【Approve】 (the panel had appeared as usual) and, in another round, *before* this plugin was reached (no panel at all).
 - This plugin only asks before execution: it never rewrites a tool's arguments and never rewrites a tool's result.
 
 ---
@@ -289,6 +313,7 @@ The panel follows the **application's current language** — not the mounting pl
 ## 9. Known limitations
 
 - **Tool arguments cannot be rewritten** (see §5), so 【Modify】 defaults to "refuse and hand the edit back".
+- **HITL is not a side-effect boundary** (see §7.1): it stops a call from starting and cannot roll back a side effect that already happened; how much it protects you depends on the matcher and on the tool's own design.
 - **Mount copy is not localized**: `title` / `labels` / field titles are strings the mounting plugin supplies; this plugin does not translate them and does not accept a `{zh, en}` map (see §6.3).
 - **No session audit event**: DSH does not let a plugin append new event types, so the decision trail lives only in the tool result (and, under `allow-and-inform`, in one user message).
 - **Only the Web UI has a panel**: under ACP/TUI/headless the mount's `whenUnavailable` decides (reject by default).
@@ -361,29 +386,30 @@ Reply: `{ ok: true, accepted: true, held?, expiresAt? }` or
 
 ```text
 dsh-hitl/
-├── index.js                629   host half: service + gate + countdown/hold + SSE & decision routes + token injection
+├── index.js                639   host half: service + gate + countdown/hold + SSE & decision routes + token injection
 ├── client.js              1918   browser half: decision panel + frame-level notice (self-contained classic script, no imports)
 ├── lib/                          the host half's pure logic: no Cordis, no DOM, testable on its own
 │   ├── protocol.js         182   frame and uplink validation, limits, error codes (the single source of the protocol)
-│   ├── resolve.js          302   matcher compilation (name/glob/RegExp/predicate), option normalization and diagnostics
+│   ├── resolve.js          311   matcher compilation (name/glob/RegExp/predicate), option normalization and diagnostics
 │   ├── fields.js           244   default proposal derivation, diff pairing, decision → model-visible text
 │   └── pending.js          217   the pending-decision state machine (injectable clock): countdown, hold, settle-once
 ├── locale/                       the plugin list's name and description (shape must be {"meta":{...}}, see §6.3)
 │   ├── en.json               6
 │   └── zh.json               6
-├── docs/                         the screenshots shown above, one set per language (-en / -cn)
-├── tests/                        zero-dependency Node tests, 152 cases in total
+├── docs/                         screenshot sources, deliberately NOT shipped: the README links the landing page instead
+├── tests/                        zero-dependency Node tests, 153 cases in total
 │   ├── client.test.js      818   (65) the browser half's pure helpers + store / connection / seat
 │   ├── fields.test.js      269   (26) proposal derivation and decision text
 │   ├── pending.test.js     240   (18) the state machine (injected clock, no real waiting)
-│   ├── resolve.test.js     162   (18) matchers and option normalization
+│   ├── resolve.test.js     181   (19) matchers and option normalization
 │   ├── protocol.test.js    117   (16) frame and uplink validation
-│   ├── docs.test.js        116   (5) the two READMEs, their links, and the numbers in this very table
+│   ├── docs.test.js        121   (5) the two READMEs, the landing-page link, and the numbers in this very table
 │   └── manifest.test.js     77   (4) package metadata and the locale resource shape
 ├── .github/workflows/release.yml     tag-triggered publish via npm trusted publishing (OIDC)
-├── package.json             69   manifest: exports / dsh.bundle.patch / dsh.client / icon
+├── package.json             68   manifest: exports / dsh.bundle.patch / dsh.client / icon
 ├── cordis.patch.yml         17   the bundle's configuration layer (inserts the row with id `hitl`)
 ├── icon.svg                  6   the plugin list icon
+├── LICENSE                       MIT
 ├── README.md                     this document
 └── README.zh.md                  the Chinese twin of this document
 ```
@@ -395,7 +421,7 @@ dsh-hitl/
 | `index.js`, `lib/*.js` | host half (Node) | **restart dsh**. Node's ESM module cache is not invalidated by "disable → enable on that row" |
 | `client.js` | browser half | **client hot-reload** picks it up (the host stats each row's client artefact every 500ms and broadcasts over `/plugins/events`); no page refresh needed |
 | `locale/*.json` | plugin-list metadata | when the plugin manager re-reads metadata (opening the plugins page / restarting dsh) |
-| `docs/*.png` | documentation | when the README is rendered |
+| `docs/*.png` | screenshot sources | kept in the repository only; the published package excludes them (see the appendix note) |
 | `package.json`, `cordis.patch.yml` | manifest and config layer | a restart or a reload of that row; an installed package is not swapped in place |
 | `tests/*.js` | development | never runs in production; executed by `npm test` / `node --test` |
 
@@ -411,7 +437,7 @@ dsh-hitl/
 
 ```sh
 node --check index.js client.js lib/*.js     # syntax
-npm test                                     # 152 zero-dependency cases: pure functions, state machines, the channel
+npm test                                     # 153 zero-dependency cases: pure functions, state machines, the channel
 npm run check                                # both of the above (syntax + the whole suite)
 ```
 
