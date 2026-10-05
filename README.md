@@ -99,16 +99,18 @@ export function apply(ctx) {
 }
 ```
 
-> **Always pass `owner` (the third argument).** Mounts are state owned by the `hitl` plugin, not by yours. Without an owner, the disposer `protect()` returns is the only way to unbind — and "return a function from `apply`" is **not** a lifetime: it was measured that the mount outlives the unloaded plugin row, leaving that tool blocked forever. With `ctx`, `hitl` registers an effect on your plugin's context and the mount is released when your plugin unloads. The equivalent explicit form is to wrap it in your own effect: `ctx.effect(() => ctx.hitl.protect('bash', {...}), 'my-plugin: hitl mount')`. If a mount does linger, look at `ctx.hitl.list()` and clear it with `ctx.hitl.unprotect('bash')`, or toggle the `hitl` row off and on in the plugins page (which rebuilds the plugin's state).
+> **`owner` decides whose account this mount's revocation is filed under.** It is the calling plugin's Cordis context — normally the `ctx` your `apply` received: pass it and `hitl` files the mount's release on the calling plugin's fiber, so the mount is removed automatically when that plugin is unloaded, disabled, or reloaded. The mount itself is state owned by the `hitl` plugin, not by yours — so without an owner the disposer `protect()` returns is the only way to unbind, and "return a function from `apply`" is **not** a lifetime: it was measured that the mount outlives the unloaded plugin row, leaving that tool blocked forever. The equivalent explicit form is to wrap it in your own effect: `ctx.effect(() => ctx.hitl.protect('bash', {...}), 'my-plugin: hitl mount')`. If a mount does linger, look at `ctx.hitl.list()` and clear it with `ctx.hitl.unprotect('bash')`, or toggle the `hitl` row off and on in the plugins page (which rebuilds the plugin's state).
 
 ### 2.3 Service API
 
 | Member | Purpose |
 |---|---|
-| `protect(matcher, options?, owner?)` | Mount one tool; pass the caller's ctx as `owner` for automatic unbinding; returns a disposer |
+| `protect(matcher, options?, owner?)` | Mount one tool; returns a disposer. Pass the caller's own ctx as `owner` to file this mount's unbinding under that plugin's lifetime: the mount is removed automatically when the caller is unloaded, disabled, or reloaded. Omit it and the mount outlives its caller |
 | `unprotect(matcher)` | Remove the mounts a matcher describes; returns how many were removed |
 | `list()` | Every current mount (diagnostics) |
 | `pending()` | Every request currently waiting for a human (diagnostics) |
+
+> `owner` is optional in the signature because there is a second entry point: the rows in `config.protect` belong to the `hitl` plugin itself (they are cleared when that row unloads) and need no owner. On the `ctx.hitl.protect()` API, however, it is required in practice — omitting it is not a legal simplification but a trap.
 
 `matcher`: a tool name / a glob string containing `*` / a `RegExp` / an array of those / `(exec) => boolean`.
 When one tool is mounted several times, **the most recent mount wins** (the config row registers first and plugins later — so a plugin can override the config).
@@ -433,7 +435,7 @@ dsh-hitl/
 │   └── manifest.test.js     77   (4) package metadata and the locale resource shape
 ├── .github/workflows/release.yml     tag-triggered publish via npm trusted publishing (OIDC)
 ├── package.json             68   manifest: exports / dsh.bundle.patch / dsh.client / icon
-├── cordis.patch.yml         17   the bundle's configuration layer (inserts the row with id `hitl`)
+├── cordis.patch.yml         18   the bundle's configuration layer (inserts the row with id `hitl`)
 ├── icon.svg                  6   the plugin list icon
 ├── LICENSE                       MIT
 ├── README.md                     this document

@@ -105,10 +105,12 @@ export function apply(ctx) {
 }
 ```
 
-> **一定要带 `owner`（第三个参数）**：挂载是记在 `hitl` 插件里的状态，不是你的插件状态。
-> 不传 owner 时，`protect()` 返回的 disposer 就是唯一的解绑手段——而"从 `apply` 里 return 一个函数"
+> **`owner` 决定这次挂载的"撤销权"记在谁账上。** 它是调用方插件的 Cordis 上下文，通常就是你
+> `apply` 收到的 `ctx`：传了它，`hitl` 会把这次挂载的解绑登记在调用方插件的 fiber 上，
+> 该插件被卸载 / 禁用 / 重载时，挂载自动移除。
+> 挂载本身是记在 `hitl` 插件里的状态，不是你的插件状态——所以不传 owner 时，`protect()` 返回的
+> disposer 就是唯一的解绑手段，而"从 `apply` 里 return 一个函数"
 > **不算生命周期**：实测过，插件行被卸载后挂载仍然生效，那个工具会被永久拦下去。
-> 传了 `ctx` 之后，`hitl` 会在你的插件上下文上注册一个 effect，插件卸载即自动解绑。
 > 另一种等价写法是把它包进你自己的 effect：
 > `ctx.effect(() => ctx.hitl.protect('bash', {...}), 'my-plugin: hitl mount')`。
 > 万一留下了残留挂载，用 `ctx.hitl.list()` 看一眼，`ctx.hitl.unprotect('bash')` 清掉；
@@ -118,10 +120,14 @@ export function apply(ctx) {
 
 | 成员 | 说明 |
 |---|---|
-| `protect(matcher, options?, owner?)` | 挂载一个工具；`owner` 传调用方 ctx 即可自动解绑；返回 disposer |
+| `protect(matcher, options?, owner?)` | 挂载一个工具，返回 disposer。`owner` 需传入调用方自己的 ctx，用于把这次挂载的解绑登记到调用方插件的生命周期上：调用方被卸载 / 禁用 / 重载时自动移除；不传则挂载会活过调用方 |
 | `unprotect(matcher)` | 按 matcher 描述移除挂载，返回移除数量 |
 | `list()` | 当前所有挂载（诊断用） |
 | `pending()` | 当前所有等待人类决策的请求（诊断用） |
+
+> 签名上 `owner` 是可选的，因为还有另一条入口：`config.protect` 那些行天然归 `hitl` 自己管
+> （它们随 `hitl` 这一行卸载而清空），不需要 owner。但用 `ctx.hitl.protect()` 这个 API 时，
+> 它就是必需的——不传不是"一种合法的简化"，而是一个坑。
 
 `matcher`：工具名 / 含 `*` 的通配串 / `RegExp` / 上面几者的数组 / `(exec) => boolean`。
 同一个工具被挂载多次时，**后挂载的覆盖先挂载的**（配置行先注册，插件后注册，所以插件可以覆盖配置）。
@@ -495,7 +501,7 @@ dsh-hitl/
 │   └── manifest.test.js     77   （4）包元数据与 locale 资源形状
 ├── .github/workflows/release.yml     tag-triggered publish via npm trusted publishing (OIDC)
 ├── package.json             68   清单：exports / dsh.bundle.patch / dsh.client / icon
-├── cordis.patch.yml         17   bundle 的配置层（插入 id 为 hitl 的那一行）
+├── cordis.patch.yml         18   bundle 的配置层（插入 id 为 hitl 的那一行）
 ├── icon.svg                  6   插件列表图标
 ├── LICENSE                       MIT
 ├── README.md                     本文档（英文版）

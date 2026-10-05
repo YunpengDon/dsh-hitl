@@ -2,10 +2,11 @@
 #
 # The row's `config.protect` list mounts HITL on tools without writing code:
 # each entry is { tool, ...hitlOptions } and mirrors ctx.hitl.protect(tool, options).
-# Plugins mount through the `hitl` service instead:
+# Plugins mount through the `hitl` service instead — note the third argument:
+# the callback's own ctx, so the mount is released when your plugin unloads.
 #
 #   ctx.inject(['hitl'], (ctx) => {
-#     ctx.hitl.protect('bash', { countdown: { seconds: 30, action: 'reject' } })
+#     ctx.hitl.protect('bash', { countdown: { seconds: 30, action: 'reject' } }, ctx)
 #   })
 #
 # A patch replaces the whole `config` of a row it overrides, so keep every key
